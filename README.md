@@ -12,7 +12,7 @@ you can use this [setup script for Joyent](https://github.com/dekobon/easy-consu
 
 ## Docker
 
-To get started quickly, you can run this application in Docker 
+To get started quickly, you can run [this application in Docker](https://hub.docker.com/r/dekobon/visual-consul/) 
 (omit the DNS values unless you have setup Consul to act as DNS) as follows:
 
 ```bash
