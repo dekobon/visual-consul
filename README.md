@@ -4,6 +4,10 @@ This project is a [Node.js](https://nodejs.org/) application that connects
 to a running [Consul](https://www.consul.io/) instance and provides a running
 log and visualization of the services and nodes that have been added to Consul.
 
+## Demo
+
+[![Consul Visualizer Demo](http://img.youtube.com/vi/KNdoXq57NJI/0.jpg)](http://www.youtube.com/watch?v=KNdoXq57NJI "Consul Visualizer Demo")
+
 ## Setting up Consul
 
 If you want to get a Consul instance up and running quickly, you can use
@@ -19,8 +23,11 @@ To get started quickly, you can run [this application in Docker](https://hub.doc
 # Replace 192.168.131.224, 192.168.131.225 and 192.168.131.224 with the addresses
 # of the three Consul servers that make up your cluster.
 docker run --dns="192.168.131.224" --dns="192.168.131.225" --dns="192.168.131.226" \
-           -p 5000:5000 -e CONSUL_SERVERS="192.168.131.224:8500 192.168.131.225:8500 192.168.131.226:8500" \
-           -e SERVICE_NAME="visualizer" -e APP_PORT=5000 -it --rm dekobon/visual-consul
+           -p 5000:5000 \
+           -e CONSUL_SERVERS="192.168.131.224:8500 192.168.131.225:8500 192.168.131.226:8500" \
+           -e SERVICE_NAME="visualizer" \
+           -e APP_PORT=5000 \
+           -d --name visualizer dekobon/visual-consul
 ```
 
 Then just visit the newly instantiated Docker instance on port 5000.
