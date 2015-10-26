@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+##
+# Returns the alias (plain-text) name for the zone in which it was invoked.
+# When the zone alias is unavailable, it defaults to the hostname.
+# Note: you need to run this as root in order to get the alias.
+
+if [ -n "$(which mdata-get)" ]; then
+    MDATA_GET_PATH="$(which mdata-get)"
+elif [ -f /usr/sbin/mdata-get ]; then
+    MDATA_GET_PATH="/usr/sbin/mdata-get"
+elif [ -f /native/usr/sbin/mdata-get ]; then
+    MDATA_GET_PATH="/native/usr/sbin/mdata-get"
+else
+    hostname
+    exit 0
+fi
+
+ALIAS="$(${MDATA_GET_PATH} sdc:alias)"
+
+if [ -n "${ALIAS}" ]; then
+    echo "${ALIAS}"
+else
+    hostname
+fi

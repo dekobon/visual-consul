@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+
+##
+# Script to register a node with Consul.
+
+echoerr() { cat <<< "$@" 1>&2; }
+
+usage() {
+    echoerr "Usage: $0 [OPTION] [CONSUL SERVER]...
+Required Options:
+  -n <string>          Node to add
+  -a <string>          Network address to associate with node
+Optional:
+  -d <string>          Datacenter to associate with node
+  -i <string>          Service id
+  -s <string>          Service name"
+    exit 1
+}
+
+if [ $# -eq 0 ]; then
+    usage
+fi
+
+checkargs() {
+    GOOD=1
+
+    if [ -z "$node" ]; then
+        echoerr "Node (-n) is a required option"
+        GOOD=0
+    fi
+
+    if [ -z "$ip" ]; then
+        echoerr "Address (-a) is a required option"
+        GOOD=0
+    fi
+
+    if [ ${GOOD} -eq 0 ]; then
+        exit 1
+    fi
+}
+
+jsonadds() {
+    if [ -z "${2}" ]; then
+        echo $JSON
+    else
+        local add=$(printf '{"%s":"%s"}' ${1} ${2})
+        echo $JSON | jq ". + $add"
+    fi
+}
+
+HTTP_BASIC_AUTH="$CONSUL_USER:$CONSUL_PASSWORD"
+
+if [ "$HTTP_BASIC_AUTH" == ":" ]; then
+    CURL_AUTH=""
+else
+    echoerr "Authenticating using HTTP basic"
+    CURL_AUTH="--user ${HTTP_BASIC_AUTH}"
+fi
+
+while getopts ":n:a:d:i:s:h" options
+do
+    case $options in
+        n ) node=${OPTARG}
+        ;;
+        a ) ip=${OPTARG}
+        ;;
+        d ) dc=${OPTARG}
+        ;;
+        i ) service_id=${OPTARG}
+        ;;
+        s ) service_name=${OPTARG}
+        ;;
+        h* ) usage
+        ;;
+    esac
+done
+shift $((OPTIND-1))
+
+checkargs
+
+HTTP_BASIC_AUTH="$CONSUL_USER:$CONSUL_PASSWORD"
+
+if [ "$HTTP_BASIC_AUTH" == ":" ]; then
+    CURL_AUTH=""
+else
+    echoerr "Authenticating using HTTP basic"
+    CURL_AUTH="--user ${HTTP_BASIC_AUTH}"
+fi
+
+ENDPOINT="v1/catalog/register"
+CURL="curl -Lkfs $CURL_AUTH --retry 2 --retry-delay 1 --connect-timeout 1"
+VERIFY_REGEX="^\{\"consul\".*$"
+JSON="$(printf '{"Node":"%s","Address":"%s"}' "${node}" ${ip})"
+JSON="$(jsonadds 'Datacenter' $dc)"
+
+if [ -n "$service_name" ]; then
+    if [ -n "$service_id" ]; then
+        SERVICE_JSON="$(printf '{"Service": {"Service":"%s", "ID":"%s"}}' "${service_name}" ${service_id})"
+    else
+        SERVICE_JSON="$(printf '{"Service": {"Service":"%s"}}' "${service_name}")"
+    fi
+
+    JSON="$(echo $JSON | jq ". + $SERVICE_JSON")"
+fi
+
+# Bad hack that renormalizes concatenated string so that it escapes correctly
+JSON="$(printf '%s' $JSON)"
+
+for server in "$@"
+do
+    HTTP_ATTEMPT=$(${CURL} -d ${JSON} "http://$server/$ENDPOINT")
+    if [ "${HTTP_ATTEMPT}" == "true" ]; then
+        echoerr "Registered node $node:$ip with $server"
+        break
+    fi
+
+    HTTPS_ATTEMPT=$(${CURL} -d ${JSON} "http://$server/$ENDPOINT")
+    if [ "${HTTPS_ATTEMPT}" == "true" ]; then
+        echoerr "Registered node $node:$ip with $server via HTTPS"
+        break
+    fi
+
+    echoerr "Couldn't connect to $server"
+done

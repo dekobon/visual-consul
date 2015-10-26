@@ -1,0 +1,51 @@
+html {
+  height: 100%;
+}
+
+body {
+  font-family: sans-serif;
+  height: 100%;
+}
+
+#messages {
+  list-style-type: none;
+  border-left: 2px solid black;
+  border-right: 2px solid black;
+  border-bottom: 2px solid black;
+  padding: 0;
+  height: 25%;
+  bottom: 0;
+  margin-bottom: 1px;
+  position: absolute;
+  width: 100%;
+  overflow-y: scroll;
+}
+
+#messages li {
+  font-family: monospace;
+  padding-top: 0.2em;
+  padding-left: 0.2em;
+  padding-right: 0.2em;
+}
+
+#messages li:nth-child(odd) {
+  background: #929292;
+}
+
+#messages #messages_header {
+  background: #38b0fb;
+  border-bottom: 1px solid black;
+  font-family: sans-serif;
+}
+
+#graph {
+  padding: 0;
+  border: 2px solid black;
+  height: 100%;
+  float: none;
+  overflow: hidden;
+}
+
+div[class^="container"] {
+  height: 75%;
+}

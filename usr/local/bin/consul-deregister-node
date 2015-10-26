@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+
+##
+# Script to deregister a node with Consul.
+
+echoerr() { cat <<< "$@" 1>&2; }
+
+usage() {
+    echoerr "Usage: $0 [OPTION] [CONSUL SERVER]...
+Required Options:
+  -n <string>          Node to remove
+Optional:
+  -d <string>          Datacenter associated with node"
+}
+
+if [ $# -eq 0 ]; then
+    usage
+fi
+
+checkargs() {
+    GOOD=1
+
+    if [ -z "$node" ]; then
+        echoerr "Node (-n) is a required option"
+        GOOD=0
+    fi
+
+    if [ ${GOOD} -eq 0 ]; then
+        exit 1
+    fi
+}
+
+jsonadds() {
+    if [ -z "${2}" ]; then
+        echo $JSON
+    else
+        local add=$(printf '{"%s":"%s"}' ${1} ${2})
+        echo $JSON | jq ". + $add"
+    fi
+}
+
+HTTP_BASIC_AUTH="$CONSUL_USER:$CONSUL_PASSWORD"
+
+if [ "$HTTP_BASIC_AUTH" == ":" ]; then
+    CURL_AUTH=""
+else
+    echoerr "Authenticating using HTTP basic"
+    CURL_AUTH="--user ${HTTP_BASIC_AUTH}"
+fi
+
+while getopts ":n:d:h" options
+do
+    case $options in
+        n ) node=${OPTARG}
+        ;;
+        d ) dc=${OPTARG}
+        ;;
+        h* ) usage
+        ;;
+    esac
+done
+shift $((OPTIND-1))
+
+checkargs
+
+HTTP_BASIC_AUTH="$CONSUL_USER:$CONSUL_PASSWORD"
+
+if [ "$HTTP_BASIC_AUTH" == ":" ]; then
+    CURL_AUTH=""
+else
+    echoerr "Authenticating using HTTP basic"
+    CURL_AUTH="--user ${HTTP_BASIC_AUTH}"
+fi
+
+ENDPOINT="v1/catalog/deregister"
+CURL="curl -Lkfs $CURL_AUTH --retry 2 --retry-delay 1 --connect-timeout 1"
+VERIFY_REGEX="^\{\"consul\".*$"
+JSON="$(printf '{"Node":"%s"}' ${node})"
+JSON="$(jsonadds 'Datacenter' $dc)"
+
+# Bad hack that renormalizes concatenated string so that it escapes correctly
+JSON="$(printf '%s' $JSON)"
+
+for server in "$@"
+do
+    HTTP_ATTEMPT=$(${CURL} -d ${JSON} "http://$server/$ENDPOINT")
+    if [ "${HTTP_ATTEMPT}" == "true" ]; then
+        echoerr "Removed node $node with $server"
+        break
+    fi
+
+    HTTPS_ATTEMPT=$(${CURL} -d ${JSON} "http://$server/$ENDPOINT")
+    if [ "${HTTPS_ATTEMPT}" == "true" ]; then
+        echoerr "Removed node $node with $server via HTTPS"
+        break
+    fi
+
+    echoerr "Couldn't connect to $server"
+done

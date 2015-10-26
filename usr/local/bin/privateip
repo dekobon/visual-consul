@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+##
+# Returns the IP address of the first private network.
+
+ip -4 addr show | \
+    grep -Po 'inet \K[\d.]+' | \
+    grep -E '^(192\.168|10\.|172\.1[6789]\.|172\.2[0-9]\.|172\.3[01]\.)' | \
+    head -n1

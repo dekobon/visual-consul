@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+##
+# Script that takes an arbitrary amount of arguments of Consul servers
+# and checks the health of each server. Then only healthy servers are
+# returned to STDOUT.
+
+echoerr() { cat <<< "$@" 1>&2; }
+
+HTTP_BASIC_AUTH="$CONSUL_USER:$CONSUL_PASSWORD"
+
+if [ "$HTTP_BASIC_AUTH" == ":" ]; then
+    CURL_AUTH=""
+else
+    echoerr "Authenticating using HTTP basic"
+    CURL_AUTH="--user ${HTTP_BASIC_AUTH}"
+fi
+
+ENDPOINT="v1/agent/services"
+CURL="curl -Lkfs $CURL_AUTH -H 'Accept: application/json' --retry 2 --retry-delay 1 --connect-timeout 1"
+VERIFY_REGEX="^\{\"consul\".*$"
+
+for server in "$@"
+do
+    HTTP_ATTEMPT=$(${CURL} "http://$server/$ENDPOINT")
+    if [ -n "$(echo ${HTTP_ATTEMPT} | grep "$VERIFY_REGEX")" ]; then
+        echo $server
+        continue
+    fi
+
+    HTTPS_ATTEMPT=$(${CURL} "https://$server/$ENDPOINT")
+    if [ -n "$(echo ${HTTPS_ATTEMPT} | grep "$VERIFY_REGEX")" ]; then
+        echo $server
+        continue
+    fi
+
+    echoerr "$server is unhealthy"
+done

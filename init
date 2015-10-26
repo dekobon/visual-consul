@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+
+pid=0
+
+echoerr() { cat <<< "$@" 1>&2; }
+
+if [ -z "$CONSUL_SERVERS" ]; then
+
+    echoerr "CONSUL_SERVERS environment variable required. Exiting."
+    exit 1
+fi
+
+if [ -z "$SERVICE_NAME" ]; then
+    echoerr "SERVICE_NAME environment variable required. Exiting."
+    exit 1
+fi
+
+if [ -z "$APP_PORT" ]; then
+    echoerr "APP_PORT environment variable required. Exiting."
+    exit 1
+fi
+
+SCRIPT_DIR="/usr/local/bin"
+HEALTHY_CONSULS=$(${SCRIPT_DIR}/consul-health ${CONSUL_SERVERS} | tr "\n" ' ')
+
+if [ -z "$HEALTHY_CONSULS" ]; then
+    echoerr "No health Consul servers could be found. Exiting."
+    exit 1
+fi
+
+echo "Found healthy Consul instances: ${HEALTHY_CONSULS}"
+
+NODE_NAME="$(${SCRIPT_DIR}/zonealias)"
+
+register() {
+    local private_ip="$(${SCRIPT_DIR}/privateip)"
+    local service_id="$(echo -n ${SERVICE_NAME} | tr -cd '[:alnum:] [:space:]' | tr '[:space:]' '-'  | tr '[:upper:]' '[:lower:]')"
+
+    echoerr "Registering [$NODE_NAME] ($private_ip) to service [$SERVICE_NAME] ($service_id) with Consul"
+    ${SCRIPT_DIR}/consul-register-node \
+        -n "${NODE_NAME}" \
+        -a "${private_ip}" \
+        -s "${SERVICE_NAME}" \
+        -i "${service_id}" \
+        ${CONSUL_SERVERS}
+}
+
+deregister() {
+    echoerr "Deregistering [$NODE_NAME] from Consul"
+    ${SCRIPT_DIR}/consul-deregister-node -n ${NODE_NAME} ${CONSUL_SERVERS}
+}
+
+term_handler() {
+  if [[ -n "$pid" ]] && [[ $pid -ne 0 ]]; then
+    kill -SIGTERM "$pid"
+    wait "$pid"
+  fi
+  exit 143
+}
+
+# Register current node with Consul
+register
+
+cd /app
+
+# run application
+su node -c "node ." &
+pid="$!"
+
+# Automatically deregister current node when init script exits
+trap deregister EXIT
+trap 'kill ${!}; term_handler' SIGINT SIGTERM
+
+# wait indefinetely
+while true
+do
+  tail -f /dev/null & wait ${!}
+done
