@@ -1,0 +1,13 @@
+{
+  "consul": "http://165.225.168.222:8500",
+  "onStart": "/opt/containerbuddy/reload-app.sh",
+  "services": [
+    {
+      "name": "app",
+      "port": 3000,
+      "health": "/usr/bin/curl --fail -s http://localhost:3000",
+      "poll": 10,
+      "ttl": 25
+    }
+  ]
+}
